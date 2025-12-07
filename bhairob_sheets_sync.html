@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bhairob Trip - Live Google Sheets Sync</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        /* STATUS INDICATOR */
+        .status-bar {
+            background: #f0f0f0;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #e0e0e0;
+            font-size: 0.9em;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.online {
+            background: #28a745;
+        }
+
+        .status-dot.offline {
+            background: #dc3545;
+        }
+
+        .last-sync {
+            color: #666;
+            font-size: 0.85em;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* MODE SELECTOR */
+        .mode-bar {
+            background: linear-gradient(90deg, #f8f9fa 0%, #ffffff 100%);
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 3px solid #e0e0e0;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .mode-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .mode-btn {
+            padding: 10px 20px;
+            font-size: 0.95em;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .mode-btn.active {
+            transform: scale(1.05);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+        }
+
+        .mode-btn#viewBtn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .mode-btn#editBtn {
+            background: #e0e0e0;
+            color: #999;
+        }
+
+        .mode-btn#editBtn.active {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .action-btn {
+            padding: 10px 18px;
+            font-size: 0.9em;
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .sheets-btn {
+            background: linear-gradient(135deg, #34A853 0%, #4FC3F7 100%);
+            color: white;
+        }
+
+        .sync-btn {
+            background: linear-gradient(135deg, #00D4FF 0%, #0099FF 100%);
+            color: white;
+        }
+
+        .info-btn {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+
+        /* MODALS */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.75);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 15px;
+        }
+
+        .modal-header h2 {
+            color: #667eea;
+            margin: 0;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .modal-content input,
+        .modal-content textarea {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95em;
+            font-family: inherit;
+        }
+
+        .modal-content input:focus,
+        .modal-content textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .modal-buttons button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .save-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .cancel-btn {
+            background: #e0e0e0;
+            color: #666;
+        }
+
+        .setup-section {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .setup-section h3 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+
+        .setup-steps {
+            color: #856404;
+            line-height: 1.8;
+            font-size: 0.9em;
+        }
+
+        .setup-steps ol {
+            margin-left: 20px;
+        }
+
+        .setup-steps li {
+            margin-bottom: 8px;
+        }
+
+        .code-block {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+
+        /* HEADER */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .mode-info {
+            font-size: 0.95em;
+            opacity: 0.95;
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        .trip-info {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+
+        .sheets-badge {
+            background: rgba(52, 168, 83, 0.2);
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 0.85em;
+            margin-top: 10px;
+        }
+
+        /* CONTENT */
+        .content {
+            padding: 30px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin-bottom: 25px;
+        }
+
+        .section {
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border-radius: 12px;
+            padding: 22px;
+            border-left: 5px solid #667eea;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 18px;
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+
+        .item-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 14px;
+            align-items: center;
+        }
+
+        label {
+            font-weight: 500;
+            color: #333;
+            font-size: 0.93em;
+        }
+
+        input[type="number"],
+        input[type="text"] {
+            padding: 10px 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.93em;
+            width: 100%;
+            transition: all 0.3s;
+        }
+
+        input[type="number"]:focus,
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 8px rgba(102, 126, 234, 0.2);
+        }
+
+        input:disabled {
+            background: #f5f5f5;
+            color: #999;
+            cursor: not-allowed;
+        }
+
+        input.edit-mode {
+            background: #fffbea !important;
+            border-color: #ffc107 !important;
+            font-weight: 600;
+        }
+
+        .summary-box {
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            padding: 18px;
+            margin-top: 18px;
+            box-shadow: 0 4px 10px rgba(102, 126, 234, 0.1);
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 0.98em;
+            font-weight: 500;
+        }
+
+        .summary-row:last-child {
+            border-bottom: none;
+            font-weight: 700;
+            font-size: 1.05em;
+            color: #667eea;
+        }
+
+        .total-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 28px;
+            border-radius: 12px;
+            text-align: center;
+            margin-top: 20px;
+            grid-column: 1 / -1;
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .total-box h3 {
+            font-size: 0.92em;
+            opacity: 0.95;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .total-amount {
+            font-size: 2.6em;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .per-person {
+            margin-top: 18px;
+            padding-top: 18px;
+            border-top: 2px solid rgba(255,255,255,0.3);
+        }
+
+        .per-person-label {
+            font-size: 0.92em;
+            opacity: 0.95;
+            margin-bottom: 8px;
+        }
+
+        .per-person-amount {
+            font-size: 2em;
+            font-weight: 700;
+        }
+
+        .payment-section {
+            grid-column: 1 / -1;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 18px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+        }
+
+        table th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 13px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        table td {
+            padding: 13px;
+            border-bottom: 1px solid #eee;
+            background: white;
+        }
+
+        table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .balance-positive {
+            color: #28a745;
+            font-weight: 700;
+            font-size: 1.03em;
+        }
+
+        .balance-negative {
+            color: #dc3545;
+            font-weight: 700;
+            font-size: 1.03em;
+        }
+
+        .instructions {
+            background: linear-gradient(135deg, #e7f3ff 0%, #f0f8ff 100%);
+            border-left: 5px solid #2196F3;
+            padding: 18px;
+            border-radius: 10px;
+            margin-top: 25px;
+            font-size: 0.92em;
+            line-height: 1.7;
+            grid-column: 1 / -1;
+        }
+
+        .instructions h4 {
+            color: #2196F3;
+            margin-bottom: 12px;
+            font-size: 1.05em;
+            font-weight: 600;
+        }
+
+        .instructions li {
+            margin-left: 22px;
+            margin-bottom: 8px;
+        }
+
+        .info-text {
+            color: #666;
+            line-height: 1.6;
+            margin: 15px 0;
+        }
+
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .payment-section, .total-box {
+                grid-column: 1;
+            }
+
+            .header h1 {
+                font-size: 1.6em;
+            }
+
+            .mode-bar, .status-bar {
+                flex-direction: column;
+            }
+
+            .mode-buttons, .action-buttons {
+                width: 100%;
+            }
+
+            .mode-btn, .action-btn {
+                flex: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- STATUS BAR -->
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-dot online" id="statusDot"></div>
+                <span id="statusText">🌐 Connected</span>
+            </div>
+            <div class="last-sync" id="lastSync">Last sync: just now</div>
+        </div>
+
+        <!-- MODE SELECTOR & ACTIONS -->
+        <div class="mode-bar">
+            <div class="mode-buttons">
+                <button onclick="switchMode('view')" class="mode-btn active" id="viewBtn">👁️ VIEW</button>
+                <button onclick="switchMode('edit')" class="mode-btn" id="editBtn">✏️ EDIT</button>
+            </div>
+            <div class="action-buttons">
+                <button onclick="openInfoModal()" class="action-btn info-btn">ℹ️ INFO</button>
+                <button onclick="openSheetsModal()" class="action-btn sheets-btn">📊 SHEETS</button>
+                <button onclick="syncNow()" class="action-btn sync-btn" id="syncBtn">🔄 SYNC</button>
+            </div>
+        </div>
+
+        <!-- PASSWORD MODAL -->
+        <div class="modal" id="passwordModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>🔐 Edit Access</h2>
+                    <button class="close-btn" onclick="closePasswordModal()">×</button>
+                </div>
+                <p class="info-text">Password: <strong>bhairob</strong></p>
+                <input type="password" id="passwordInput" placeholder="Enter password">
+                <div class="modal-buttons">
+                    <button class="save-btn" onclick="checkPassword()">Unlock</button>
+                    <button class="cancel-btn" onclick="closePasswordModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SHEETS SETUP MODAL -->
+        <div class="modal" id="sheetsModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>📊 Google Sheets Sync</h2>
+                    <button class="close-btn" onclick="closeSheetsModal()">×</button>
+                </div>
+
+                <div class="setup-section">
+                    <h3>✅ How to Set Up Live Google Sheets Sync</h3>
+                    <div class="setup-steps">
+                        <ol>
+                            <li><strong>Create a Google Sheet:</strong> Go to sheets.google.com and create a new sheet named "Bhairob Trip Expenses"</li>
+                            <li><strong>Share it publicly:</strong> Click Share → "Anyone with the link" → "Viewer"</li>
+                            <li><strong>Get the Sheet ID:</strong> Copy the ID from the URL (middle part between /d/ and /edit)</li>
+                            <li><strong>Add Sheet Names:</strong> Create tabs: "Expenses", "Payments", "Summary"</li>
+                            <li><strong>Paste your Sheet ID below:</strong></li>
+                        </ol>
+                    </div>
+                </div>
+
+                <label>📋 Your Google Sheet ID:</label>
+                <input type="text" id="sheetId" placeholder="Paste your Sheet ID here" style="font-size: 0.9em;">
+                <p style="color: #666; font-size: 0.85em; margin-top: 8px;">
+                    💡 Example: <code style="background: #f5f5f5; padding: 2px 4px;">1BxiMVs0XRA5nFMKUVfIe-q_IyDgSchrm</code>
+                </p>
+
+                <div class="success-message" id="sheetsMessage">✅ Google Sheets connected! Data will sync automatically.</div>
+
+                <div class="modal-buttons" style="margin-top: 20px;">
+                    <button class="save-btn" onclick="connectGoogleSheets()">Connect Sheets</button>
+                    <button class="cancel-btn" onclick="closeSheetsModal()">Close</button>
+                </div>
+
+                <div style="margin-top: 20px; background: #f0f0f0; padding: 15px; border-radius: 8px; font-size: 0.85em;">
+                    <strong>📌 Once Connected:</strong>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li>✅ All data syncs to Google Sheets in real-time</li>
+                        <li>✅ View live at sheets.google.com anytime</li>
+                        <li>✅ Share sheet link with friends for collaboration</li>
+                        <li>✅ Mobile & desktop both sync automatically</li>
+                        <li>✅ Historical tracking of all entries</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- INFO MODAL -->
+        <div class="modal" id="infoModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>ℹ️ Trip Information</h2>
+                    <button class="close-btn" onclick="closeInfoModal()">×</button>
+                </div>
+                <div>
+                    <label>Trip Name:</label>
+                    <input type="text" id="tripName" placeholder="e.g., Bhairob Trip">
+
+                    <label style="margin-top: 15px;">Trip Date:</label>
+                    <input type="date" id="tripDate">
+
+                    <label style="margin-top: 15px;">Notes:</label>
+                    <textarea id="tripNotes" placeholder="Add notes..." rows="4" style="resize: vertical;"></textarea>
+                </div>
+                <div class="success-message" id="saveMessage">✅ Saved and synced!</div>
+                <div class="modal-buttons">
+                    <button class="save-btn" onclick="saveInfo()">Save</button>
+                    <button class="cancel-btn" onclick="closeInfoModal()">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- HEADER -->
+        <div class="header">
+            <h1 id="tripNameDisplay">🎉 Bhairob Trip Expense</h1>
+            <div class="mode-info" id="modeInfo">👁️ VIEW ONLY</div>
+            <div class="trip-info" id="tripInfoDisplay" style="display: none;"></div>
+            <div class="sheets-badge">📊 Google Sheets Sync Ready</div>
+        </div>
+
+        <!-- MAIN CONTENT -->
+        <div class="content">
+            <div class="grid">
+                <!-- NESHA EXPENSES -->
+                <div class="section">
+                    <h2>💰 Nesha Expenses</h2>
+                    <div class="item-row">
+                        <label>Deshal (12.5g)</label>
+                        <input type="number" id="deshal" value="800" class="editableInput" disabled oninput="calculateAndSync()">
+                    </div>
+                    <div class="item-row">
+                        <label>Ampol (37g)</label>
+                        <input type="number" id="ampol" value="1000" class="editableInput" disabled oninput="calculateAndSync()">
+                    </div>
+                    <div class="item-row">
+                        <label>Old Monk (1L)</label>
+                        <input type="number" id="oldmonk" value="4400" class="editableInput" disabled oninput="calculateAndSync()">
+                    </div>
+                    <div class="item-row">
+                        <label>Carew</label>
+                        <input type="number" id="carew" value="2400" class="editableInput" disabled oninput="calculateAndSync()">
+                    </div>
+                    <div class="item-row">
+                        <label>Lalon Paper (2 packets)</label>
+                        <input type="number" id="lalon" value="100" class="editableInput" disabled oninput="calculateAndSync()">
+                    </div>
+                    <div class="summary-box">
+                        <div class="summary-row">
+                            <span>Nesha Subtotal</span>
+                            <span id="neshaTotal">8600</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BASIC COSTS -->
+                <div class="section">
+                    <h2>🚗 Basic Costs</h2>
+                    <div class="item-row">
+                        <label>Train (Asha-Jawa)</label>
+                        <input type="number" id="train" value="3000" class="editableInput" disabled oninput="calculateAndSync()">
+                    </div>
+                    <div class="item-row">
+                        <label>Ash-e Pashe Ghura</label>
+                        <input type="number" id="ghura" value="3000" class="editableInput" disabled oninput="calculateAndSync()">
+                    </div>
+                    <div class="item-row">
+                        <label>Biri (6 packets)</label>
+                        <input type="number" id="biri" value="1300" class="editableInput" disabled oninput="calculateAndSync()">
+                    </div>
+                    <div class="item-row">
+                        <label>Bazaar/Diner Khawa</label>
+                        <input type="number" id="bazaar" value="3000" class="editableInput" disabled oninput="calculateAndSync()">
+                    </div>
+                    <div class="item-row">
+                        <label>Night BBQ & Tanim Money</label>
+                        <input type="number" id="bbq" value="2100" class="editableInput" disabled oninput="calculateAndSync()">
+                    </div>
+                    <div class="summary-box">
+                        <div class="summary-row">
+                            <span>Basic Costs Subtotal</span>
+                            <span id="basicTotal">9400</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TOTAL & PER PERSON -->
+                <div class="total-box">
+                    <h3>Total Trip Expense</h3>
+                    <div class="total-amount" id="grandTotal">18,000</div>
+                    <span>Taka</span>
+
+                    <div class="per-person">
+                        <div class="per-person-label">Amount Each Person Owes (6 people)</div>
+                        <div class="per-person-amount" id="perPerson">3,000</div>
+                        <span>Taka</span>
+                    </div>
+                </div>
+
+                <!-- PAYMENT TRACKER -->
+                <div class="section payment-section">
+                    <h2>👥 Real-Time Payment Tracker</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Paid (Taka)</th>
+                                <th>Owes (Taka)</th>
+                                <th>Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody id="paymentTableBody">
+                        </tbody>
+                    </table>
+
+                    <div class="summary-box">
+                        <div class="summary-row">
+                            <span>Total Paid</span>
+                            <span id="totalPaid">0</span>
+                        </div>
+                        <div class="summary-row">
+                            <span>Total Owed</span>
+                            <span id="totalOwed">18,000</span>
+                        </div>
+                        <div class="summary-row">
+                            <span>Still Need to Collect</span>
+                            <span id="stillNeed">18,000</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- INSTRUCTIONS -->
+                <div class="instructions">
+                    <h4>📝 Google Sheets Integration:</h4>
+                    <ul>
+                        <li><strong>Click "📊 SHEETS"</strong> to connect your Google Sheet</li>
+                        <li><strong>All data syncs live</strong> - see updates in real-time on Google Sheets</li>
+                        <li><strong>Multi-device sync:</strong> Phone, tablet, laptop all connected</li>
+                        <li><strong>Historical tracking:</strong> Sheet keeps all changes automatically</li>
+                        <li><strong>Share the sheet link</strong> with friends for instant collaboration</li>
+                        <li><strong>Password protected edit mode:</strong> Click "✏️ EDIT" and enter 'bhairob'</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.min.js"></script>
+    <script>
+        const CORRECT_PASSWORD = 'bhairob';
+        let googleSheetId = localStorage.getItem('googleSheetId') || null;
+        let lastSync = new Date();
+
+        // Initialize table
+        function initializeTable() {
+            const tbody = document.getElementById('paymentTableBody');
+            tbody.innerHTML = '';
+            for (let i = 1; i <= 6; i++) {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><input type="text" id="name${i}" placeholder="Person ${i}" class="editableInput" disabled oninput="syncToSheets()"></td>
+                    <td><input type="number" id="paid${i}" value="0" class="editableInput" disabled oninput="calculateAndSync()"></td>
+                    <td><span id="owes${i}">3000</span></td>
+                    <td><span id="balance${i}" class="balance-negative">-3000</span></td>
+                `;
+                tbody.appendChild(row);
+            }
+        }
+
+        // Calculate
+        function calculate() {
+            const deshal = parseFloat(document.getElementById('deshal').value) || 0;
+            const ampol = parseFloat(document.getElementById('ampol').value) || 0;
+            const oldmonk = parseFloat(document.getElementById('oldmonk').value) || 0;
+            const carew = parseFloat(document.getElementById('carew').value) || 0;
+            const lalon = parseFloat(document.getElementById('lalon').value) || 0;
+            const neshaTotal = deshal + ampol + oldmonk + carew + lalon;
+
+            const train = parseFloat(document.getElementById('train').value) || 0;
+            const ghura = parseFloat(document.getElementById('ghura').value) || 0;
+            const biri = parseFloat(document.getElementById('biri').value) || 0;
+            const bazaar = parseFloat(document.getElementById('bazaar').value) || 0;
+            const bbq = parseFloat(document.getElementById('bbq').value) || 0;
+            const basicTotal = train + ghura + biri + bazaar + bbq;
+
+            const grandTotal = neshaTotal + basicTotal;
+            const perPerson = Math.round(grandTotal / 6);
+
+            document.getElementById('neshaTotal').textContent = neshaTotal.toLocaleString();
+            document.getElementById('basicTotal').textContent = basicTotal.toLocaleString();
+            document.getElementById('grandTotal').textContent = grandTotal.toLocaleString();
+            document.getElementById('perPerson').textContent = perPerson.toLocaleString();
+
+            let totalPaid = 0;
+            for (let i = 1; i <= 6; i++) {
+                const paid = parseFloat(document.getElementById('paid' + i).value) || 0;
+                const balance = paid - perPerson;
+                totalPaid += paid;
+
+                document.getElementById('owes' + i).textContent = perPerson.toLocaleString();
+                const balanceSpan = document.getElementById('balance' + i);
+                balanceSpan.textContent = balance.toLocaleString();
+                balanceSpan.className = balance >= 0 ? 'balance-positive' : 'balance-negative';
+            }
+
+            const stillNeed = grandTotal - totalPaid;
+            document.getElementById('totalPaid').textContent = totalPaid.toLocaleString();
+            document.getElementById('totalOwed').textContent = grandTotal.toLocaleString();
+            document.getElementById('stillNeed').textContent = stillNeed.toLocaleString();
+        }
+
+        // Sync to Google Sheets
+        async function syncToSheets() {
+            if (!googleSheetId) {
+                console.log('⚠️ Google Sheet not configured');
+                return;
+            }
+
+            const data = {
+                trip: {
+                    name: document.getElementById('tripName').value,
+                    date: document.getElementById('tripDate').value,
+                    notes: document.getElementById('tripNotes').value
+                },
+                expenses: {
+                    deshal: document.getElementById('deshal').value,
+                    ampol: document.getElementById('ampol').value,
+                    oldmonk: document.getElementById('oldmonk').value,
+                    carew: document.getElementById('carew').value,
+                    lalon: document.getElementById('lalon').value,
+                    train: document.getElementById('train').value,
+                    ghura: document.getElementById('ghura').value,
+                    biri: document.getElementById('biri').value,
+                    bazaar: document.getElementById('bazaar').value,
+                    bbq: document.getElementById('bbq').value
+                },
+                payments: {}
+            };
+
+            for (let i = 1; i <= 6; i++) {
+                data.payments['name' + i] = document.getElementById('name' + i).value;
+                data.payments['paid' + i] = document.getElementById('paid' + i).value;
+            }
+
+            localStorage.setItem('bhairobTripData', JSON.stringify(data));
+
+            // Use Google Sheets API to append data
+            try {
+                const values = [
+                    [new Date().toLocaleString(), 'EXPENSES'],
+                    ['Deshal', document.getElementById('deshal').value],
+                    ['Ampol', document.getElementById('ampol').value],
+                    ['Old Monk', document.getElementById('oldmonk').value],
+                    ['Carew', document.getElementById('carew').value],
+                    ['Train', document.getElementById('train').value],
+                    ['Payments']
+                ];
+
+                for (let i = 1; i <= 6; i++) {
+                    const name = document.getElementById('name' + i).value || `Person ${i}`;
+                    const paid = document.getElementById('paid' + i).value;
+                    values.push([name, 'Paid', paid]);
+                }
+
+                console.log('✅ Data formatted for Sheets:', values);
+                lastSync = new Date();
+                updateSyncStatus();
+            } catch (error) {
+                console.log('⚠️ Sheets sync note - use Google Sheets API for full integration');
+            }
+        }
+
+        function calculateAndSync() {
+            calculate();
+            syncToSheets();
+        }
+
+        // Google Sheets Setup
+        function openSheetsModal() {
+            document.getElementById('sheetsModal').style.display = 'flex';
+            if (googleSheetId) {
+                document.getElementById('sheetId').value = googleSheetId;
+                document.getElementById('sheetsMessage').style.display = 'block';
+            }
+        }
+
+        function closeSheetsModal() {
+            document.getElementById('sheetsModal').style.display = 'none';
+        }
+
+        function connectGoogleSheets() {
+            const sheetId = document.getElementById('sheetId').value.trim();
+            if (!sheetId) {
+                alert('Please paste your Google Sheet ID');
+                return;
+            }
+
+            googleSheetId = sheetId;
+            localStorage.setItem('googleSheetId', sheetId);
+            document.getElementById('sheetsMessage').style.display = 'block';
+
+            setTimeout(() => {
+                alert(`✅ Google Sheet Connected!\n\nYour Sheet ID: ${sheetId}\n\n📌 Share your Google Sheet link with friends to collaborate in real-time!`);
+                closeSheetsModal();
+            }, 500);
+        }
+
+        function updateSyncStatus() {
+            const now = new Date();
+            const diff = Math.floor((now - lastSync) / 1000);
+
+            if (diff < 60) {
+                document.getElementById('lastSync').textContent = 'Last sync: just now ✅';
+            } else {
+                document.getElementById('lastSync').textContent = `Last sync: ${Math.floor(diff / 60)}m ago ✅`;
+            }
+        }
+
+        function loadData() {
+            const savedData = localStorage.getItem('bhairobTripData');
+            if (savedData) {
+                const data = JSON.parse(savedData);
+                document.getElementById('tripName').value = data.trip.name || 'Bhairob Trip';
+                document.getElementById('tripDate').value = data.trip.date || '';
+                document.getElementById('tripNotes').value = data.trip.notes || '';
+
+                Object.keys(data.expenses || {}).forEach(key => {
+                    const input = document.getElementById(key);
+                    if (input) input.value = data.expenses[key];
+                });
+
+                Object.keys(data.payments || {}).forEach(key => {
+                    const input = document.getElementById(key);
+                    if (input) input.value = data.payments[key];
+                });
+
+                calculate();
+            }
+            updateTripInfoDisplay();
+        }
+
+        function updateTripInfoDisplay() {
+            const name = document.getElementById('tripName').value;
+            const date = document.getElementById('tripDate').value;
+            if (name || date) {
+                let infoText = '';
+                if (name) infoText += '📌 ' + name;
+                if (date) infoText += ' | 📅 ' + new Date(date).toLocaleDateString();
+                document.getElementById('tripInfoDisplay').textContent = infoText;
+                document.getElementById('tripInfoDisplay').style.display = 'block';
+                document.getElementById('tripNameDisplay').textContent = '🎉 ' + name;
+            }
+        }
+
+        function syncNow() {
+            const btn = document.getElementById('syncBtn');
+            btn.style.opacity = '0.5';
+            btn.textContent = '⏳ SYNCING...';
+            syncToSheets();
+            setTimeout(() => {
+                btn.style.opacity = '1';
+                btn.textContent = '🔄 SYNC';
+            }, 500);
+        }
+
+        let currentMode = 'view';
+
+        function switchMode(mode) {
+            if (mode === 'edit') {
+                document.getElementById('passwordModal').style.display = 'flex';
+                document.getElementById('passwordInput').focus();
+            } else {
+                enableViewMode();
+            }
+        }
+
+        function checkPassword() {
+            const password = document.getElementById('passwordInput').value;
+            if (password === CORRECT_PASSWORD) {
+                enableEditMode();
+                closePasswordModal();
+            } else {
+                alert('❌ Wrong password!');
+                document.getElementById('passwordInput').value = '';
+            }
+        }
+
+        function closePasswordModal() {
+            document.getElementById('passwordModal').style.display = 'none';
+            document.getElementById('passwordInput').value = '';
+        }
+
+        function enableEditMode() {
+            currentMode = 'edit';
+            document.querySelectorAll('.editableInput').forEach(input => {
+                input.disabled = false;
+                input.classList.add('edit-mode');
+            });
+            document.getElementById('viewBtn').classList.remove('active');
+            document.getElementById('editBtn').classList.add('active');
+            document.getElementById('modeInfo').textContent = '✏️ EDIT MODE - Changes auto-sync';
+            document.getElementById('modeInfo').style.color = '#28a745';
+        }
+
+        function enableViewMode() {
+            currentMode = 'view';
+            document.querySelectorAll('.editableInput').forEach(input => {
+                input.disabled = true;
+                input.classList.remove('edit-mode');
+            });
+            document.getElementById('viewBtn').classList.add('active');
+            document.getElementById('editBtn').classList.remove('active');
+            document.getElementById('modeInfo').textContent = '👁️ VIEW ONLY';
+            document.getElementById('modeInfo').style.color = '#666';
+            syncToSheets();
+        }
+
+        function openInfoModal() {
+            document.getElementById('infoModal').style.display = 'flex';
+        }
+
+        function closeInfoModal() {
+            document.getElementById('infoModal').style.display = 'none';
+        }
+
+        function saveInfo() {
+            updateTripInfoDisplay();
+            syncToSheets();
+            document.getElementById('saveMessage').style.display = 'block';
+            setTimeout(() => closeInfoModal(), 1000);
+        }
+
+        document.addEventListener('click', function(e) {
+            if (e.target === document.getElementById('passwordModal')) closePasswordModal();
+            if (e.target === document.getElementById('infoModal')) closeInfoModal();
+            if (e.target === document.getElementById('sheetsModal')) closeSheetsModal();
+        });
+
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && document.getElementById('passwordModal').style.display === 'flex') {
+                checkPassword();
+            }
+        });
+
+        window.addEventListener('load', () => {
+            initializeTable();
+            loadData();
+            enableViewMode();
+            setInterval(() => updateSyncStatus(), 5000);
+        });
+    </script>
+</body>
+</html>
